@@ -1,9 +1,10 @@
 package shared
 
 import (
+	"main/logger"
+
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
-	"main/logger"
 )
 
 func SetupEnv(path string) {

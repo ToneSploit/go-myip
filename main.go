@@ -32,6 +32,18 @@ func main() {
 	domain := os.Getenv("RAILWAY_PUBLIC_DOMAIN")
 	logger.Info("Running on domain", zap.String("domain", domain))
 
+	if os.Getenv("GEOIP_ENABLED") == "true" {
+		logger.Info("GeoIP lookups are enabled")
+		// Download the GeoLite2 database at startup and log the result.
+		maxminddb, err := shared.DownloadGeoLiteDB()
+		if err != nil {
+			logger.Fatal("Failed to download GeoLite2 database", zap.Error(err))
+		}
+		logger.Info("GeoLite2 database downloaded successfully", zap.String("file", maxminddb))
+	} else {
+		logger.Info("GeoIP lookups are disabled")
+	}
+
 	app := echo.New()
 
 	t := template.Must(template.ParseGlob("templates/*.html"))
