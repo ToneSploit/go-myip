@@ -53,6 +53,7 @@ func main() {
 
 		return c.Render(http.StatusOK, "index.html", map[string]string{"IP": ip})
 	})
+
 	app.GET("/health", func(c echo.Context) error {
 		logger.Info("/health called")
 		return c.JSON(http.StatusOK, map[string]interface{}{
