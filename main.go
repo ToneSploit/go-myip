@@ -18,7 +18,8 @@ func main() {
 	logger.Info("Application initialized successfully")
 
 	app := echo.New()
-	app.IPExtractor = echo.ExtractIPFromXFFHeader()
+	// app.IPExtractor = echo.ExtractIPFromXFFHeader()
+	app.IPExtractor = echo.ExtractIPFromRealIPHeader()
 
 	app.GET("/", func(c echo.Context) error {
 		logger.Info("Root endpoint called", zap.String("client_ip", c.RealIP()))
