@@ -1,8 +1,64 @@
 <!DOCTYPE html>
-<html>
-<head><title>Your IP</title></head>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your IP Address</title>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+</head>
+
 <body>
-  <h1>{{ .IP }}</h1>
-  <p>User Agent: {{ .UserAgent }}</p>
+    <header>
+        <h1>Your IP Address</h1>
+    </header>
+
+    <main>
+        <p>This page shows your IP address, browser user agent, and approximate location using GeoLite2 data from
+            MaxMind. You can also query this endpoint from command-line tools to retrieve the information in plain text
+            or JSON.</p>
+
+
+        <table>
+            <tbody>
+                <tr>
+                    <td>IP Address:</td>
+                    <td>{{ .IP }}</td>
+                </tr>
+                <tr>
+                    <td>User-Agent:</td>
+                    <td>{{ .UserAgent }}</td>
+                </tr>
+                {{ if .Country }}<tr>
+                    <td>Country:</td>
+                    <td>{{ .Country }}</td>
+                </tr>{{ end }}
+                {{ if .City }}<tr>
+                    <td>City:</td>
+                    <td>{{ .City }}</td>{{ end }}
+                </tr>
+            </tbody>
+        </table>
+    </main>
+
+    <h2>Examples</h2>
+    <p>You can use the following commands to get your visitor information in different formats:</p>
+
+    <h3>Plain Text (Linux/macOS):</h3>
+    <pre><code>curl -H "Accept: text/plain" https://ip.tonesploit.sh/</code></pre>
+
+    <h3>JSON (Linux/macOS):</h3>
+    <pre><code>curl -H "Accept: application/json" https://ip.tonesploit.sh/</code></pre>
+
+    <h3>PowerShell (Windows):</h3>
+    <pre><code>Invoke-WebRequest -Headers @{Accept='application/json'} https://ip.tonesploit.sh/ | Select-Object -ExpandProperty Content</code></pre>
+
+    <footer>
+      <p><small>
+        Location data provided by <a href="https://www.maxmind.com" target="_blank" rel="noopener">MaxMind GeoLite2</a>. |
+        View source on <a href="https://github.com/tonesploit/go-myip" target="_blank" rel="noopener">GitHub</a>
+      </small></p>
+    </footer>
 </body>
+
 </html>
