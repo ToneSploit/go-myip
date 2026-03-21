@@ -50,11 +50,16 @@ func main() {
 		}
 
 		accept := c.Request().Header.Get("Accept")
+
 		if strings.Contains(accept, "application/json") {
 			return c.JSON(http.StatusOK, map[string]string{
 				"ip":         ip,
 				"user_agent": ua,
 			})
+		}
+
+		if strings.Contains(accept, "text/plain") {
+			return c.String(http.StatusOK, fmt.Sprintf("IP: %s\nUser-Agent: %s", ip, ua))
 		}
 
 		return c.Render(http.StatusOK, "index.html", map[string]string{
