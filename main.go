@@ -57,7 +57,10 @@ func main() {
 			})
 		}
 
-		return c.Render(http.StatusOK, "index.html", map[string]string{"IP": ip})
+		return c.Render(http.StatusOK, "index.html", map[string]string{
+			"IP":        ip,
+			"UserAgent": ua,
+		})
 	})
 
 	app.GET("/health", func(c echo.Context) error {
