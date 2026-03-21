@@ -32,14 +32,16 @@ func main() {
 	domain := os.Getenv("RAILWAY_PUBLIC_DOMAIN")
 	logger.Info("Running on domain", zap.String("domain", domain))
 
+	var MaxmindDB string
 	if os.Getenv("GEOIP_ENABLED") == "true" {
 		logger.Info("GeoIP lookups are enabled")
 		// Download the GeoLite2 database at startup and log the result.
-		maxminddb, err := shared.DownloadGeoLiteDB()
+		var err error
+		MaxmindDB, err = shared.DownloadGeoLiteDB()
 		if err != nil {
 			logger.Fatal("Failed to download GeoLite2 database", zap.Error(err))
 		}
-		logger.Info("GeoLite2 database downloaded successfully", zap.String("file", maxminddb))
+		logger.Info("GeoLite2 database downloaded successfully", zap.String("file", MaxmindDB))
 	} else {
 		logger.Info("GeoIP lookups are disabled")
 	}
@@ -61,22 +63,42 @@ func main() {
 			ua = "uncertain (could not determine user agent)"
 		}
 
+		var loc *shared.GeoLocation
+		if MaxmindDB != "" {
+			var err error
+			loc, err = shared.LookupIP(MaxmindDB, ip)
+			if err != nil {
+				logger.Error("Failed to lookup IP", zap.Error(err))
+			}
+		}
+
+		// Start returning different responses based on the Accept header
 		accept := c.Request().Header.Get("Accept")
 
 		if strings.Contains(accept, "application/json") {
 			return c.JSON(http.StatusOK, map[string]string{
-				"ip":         ip,
-				"user_agent": ua,
+				"ip":             ip,
+				"user_agent":     ua,
+				"city":           loc.City,
+				"country":        loc.Country,
+				"continent":      loc.Continent,
+				"country_code":   loc.CountryCode,
+				"continent_code": loc.ContinentCode,
 			})
 		}
 
 		if strings.Contains(accept, "text/plain") {
-			return c.String(http.StatusOK, fmt.Sprintf("IP: %s\nUser-Agent: %s", ip, ua))
+			return c.String(http.StatusOK, fmt.Sprintf("IP: %s\nUser-Agent: %s\nCity: %s\nCountry: %s\nContinent: %s\nCountry Code: %s\nContinent Code: %s", ip, ua, loc.City, loc.Country, loc.Continent, loc.CountryCode, loc.ContinentCode))
 		}
 
 		return c.Render(http.StatusOK, "index.html", map[string]string{
-			"IP":        ip,
-			"UserAgent": ua,
+			"IP":            ip,
+			"UserAgent":     ua,
+			"City":          loc.City,
+			"Country":       loc.Country,
+			"Continent":     loc.Continent,
+			"CountryCode":   loc.CountryCode,
+			"ContinentCode": loc.ContinentCode,
 		})
 	})
 
