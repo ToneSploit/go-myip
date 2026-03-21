@@ -1,134 +1,40 @@
-package dnsbl
+package main
 
 import (
-	"strings"
-
-	"github.com/miekg/dns"
+	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
+	"main/logger"
+	"main/shared"
+	"net/http"
+	"time"
 )
 
-func Check(ip string, blacklist string, nameserver string) ([]string, error) {
+func main() {
+	logger.Info("Starting application", zap.String("version", "1.0.0"))
+	shared.SetupEnv(".")
+	logger.Info("Application initialized successfully")
 
-	rev, err := reverseIPv4(ip)
-	if err != nil {
-		return nil, err
+	app := echo.New()
+
+	app.GET("/", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"status": "ok",
+			"slogan": "Wow, so this is what it's like to be on the internet!",
+			"date":   time.Now().Format("2006-01-02 15:04:05"),
+		})
+	})
+
+	app.GET("/health", func(c echo.Context) error {
+		logger.Info("/health called")
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"status": "ok",
+			"slogan": "All aboard the railway express!",
+			"date":   time.Now().Format("2006-01-02 15:04:05"),
+		})
+	})
+
+	logger.Info("Starting server on port 8080")
+	if err := app.Start(":8080"); err != nil {
+		logger.Fatal("Server failed to start", zap.Error(err))
 	}
-
-	answer, err := getA(rev+"."+blacklist, nameserver)
-	if err != nil {
-		return nil, err
-	}
-
-	return answer, nil
 }
-
-func getA(hostname string, nameserver string) ([]string, error) {
-	var record []string
-	m := new(dns.Msg)
-	m.SetQuestion(dns.Fqdn(hostname), dns.TypeA)
-	c := new(dns.Client)
-	m.MsgHdr.RecursionDesired = true
-	in, _, err := c.Exchange(m, nameserver+":53")
-	if err != nil {
-		return nil, err
-	}
-	for _, rin := range in.Answer {
-		if r, ok := rin.(*dns.A); ok {
-			record = append(record, r.A.String())
-		}
-	}
-	return record, nil
-}
-
-func reverseIPv4(ip string) (string, error) {
-	PTR, err := dns.ReverseAddr(ip)
-	if err != nil {
-		return "", err
-	}
-
-	reversed := strings.TrimSuffix(PTR, ".in-addr.arpa.")
-
-	return reversed, nil
-}
-
-/*
-var Blacklists = []string{
-	"aspews.ext.sorbs.net",
-	"b.barracudacentral.org",
-	"bl.deadbeef.com",
-	"bl.emailbasura.org",
-	"bl.spamcannibal.org",
-	"bl.spamcop.net",
-	"blackholes.five-ten-sg.com",
-	"blacklist.woody.ch",
-	"bogons.cymru.com",
-	"cbl.abuseat.org",
-	"cdl.anti-spam.org.cn",
-	"combined.abuse.ch",
-	"combined.rbl.msrbl.net",
-	"db.wpbl.info",
-	"dnsbl-1.uceprotect.net",
-	"dnsbl-2.uceprotect.net",
-	"dnsbl-3.uceprotect.net",
-	"dnsbl.cyberlogic.net",
-	"dnsbl.dronebl.org",
-	"dnsbl.inps.de",
-	"dnsbl.njabl.org",
-	"dnsbl.sorbs.net",
-	"drone.abuse.ch",
-	"duinv.aupads.org",
-	"dul.dnsbl.sorbs.net",
-	"dul.ru",
-	"dyna.spamrats.com",
-	"dynip.rothen.com",
-	"http.dnsbl.sorbs.net",
-	"images.rbl.msrbl.net",
-	"ips.backscatterer.org",
-	"ix.dnsbl.manitu.net",
-	"korea.services.net",
-	"misc.dnsbl.sorbs.net",
-	"noptr.spamrats.com",
-	"ohps.dnsbl.net.au",
-	"omrs.dnsbl.net.au",
-	"orvedb.aupads.org",
-	"osps.dnsbl.net.au",
-	"osrs.dnsbl.net.au",
-	"owfs.dnsbl.net.au",
-	"owps.dnsbl.net.au",
-	"pbl.spamhaus.org",
-	"phishing.rbl.msrbl.net",
-	"probes.dnsbl.net.au",
-	"proxy.bl.gweep.ca",
-	"proxy.block.transip.nl",
-	"psbl.surriel.com",
-	"rdts.dnsbl.net.au",
-	"relays.bl.gweep.ca",
-	"relays.bl.kundenserver.de",
-	"relays.nether.net",
-	"residential.block.transip.nl",
-	"ricn.dnsbl.net.au",
-	"rmst.dnsbl.net.au",
-	"sbl.spamhaus.org",
-	"short.rbl.jp",
-	"smtp.dnsbl.sorbs.net",
-	"socks.dnsbl.sorbs.net",
-	"spam.abuse.ch",
-	"spam.dnsbl.sorbs.net",
-	"spam.rbl.msrbl.net",
-	"spam.spamrats.com",
-	"spamlist.or.kr",
-	"spamrbl.imp.ch",
-	"t3direct.dnsbl.net.au",
-	"tor.dnsbl.sectoor.de",
-	"torserver.tor.dnsbl.sectoor.de",
-	"ubl.lashback.com",
-	"ubl.unsubscore.com",
-	"virbl.bit.nl",
-	"virus.rbl.jp",
-	"virus.rbl.msrbl.net",
-	"web.dnsbl.sorbs.net",
-	"wormrbl.imp.ch",
-	"xbl.spamhaus.org",
-	"zen.spamhaus.org",
-	"zombie.dnsbl.sorbs.net"}
-
-*/
