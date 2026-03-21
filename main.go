@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"html/template"
+	"io"
 	"main/logger"
 	"main/shared"
 	"net/http"
@@ -12,26 +14,45 @@ import (
 	"go.uber.org/zap"
 )
 
+type TemplateRenderer struct {
+	templates *template.Template
+}
+
+func (r *TemplateRenderer) Render(w io.Writer, name string, data interface{}, c echo.Context) error {
+	return r.templates.ExecuteTemplate(w, name, data)
+}
+
 func main() {
 	logger.Info("Starting application", zap.String("version", "1.0.0"))
 	shared.SetupEnv(".")
 	logger.Info("Application initialized successfully")
 
 	app := echo.New()
+
+	// Not working for some reason, always returns the IP of the load balancer instead of the client IP.
 	// app.IPExtractor = echo.ExtractIPFromXFFHeader()
-	app.IPExtractor = echo.ExtractIPFromRealIPHeader()
+	// app.IPExtractor = echo.ExtractIPFromRealIPHeader()
+
+	t := template.Must(template.ParseGlob("templates/*.html"))
+	app.Renderer = &TemplateRenderer{templates: t}
 
 	app.GET("/", func(c echo.Context) error {
-		logger.Info("Root endpoint called", zap.String("client_ip", c.RealIP()))
-		// ip := c.RealIP()
+		ip := c.Request().Header.Get("X-Real-Ip")
+		if ip == "" {
+			ip = "uncertain (could not determine client IP)"
+		}
 
-		return c.JSON(http.StatusOK, map[string]interface{}{
-			"status": "ok",
-			"slogan": "Wow, so this is what it's like to be on the internet!",
-			"date":   time.Now().Format("2006-01-02 15:04:05"),
-		})
+		// logger.Info("Root endpoint called", zap.String("client_ip", ip))
+
+		accept := c.Request().Header.Get("Accept")
+		if strings.Contains(accept, "application/json") {
+			return c.JSON(http.StatusOK, map[string]string{
+				"ip": ip,
+			})
+		}
+
+		return c.Render(http.StatusOK, "index.html", map[string]string{"IP": ip})
 	})
-
 	app.GET("/health", func(c echo.Context) error {
 		logger.Info("/health called")
 		return c.JSON(http.StatusOK, map[string]interface{}{
