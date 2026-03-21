@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"main/logger"
 	"main/shared"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -36,6 +38,14 @@ func main() {
 			"slogan": "All aboard the railway express!",
 			"date":   time.Now().Format("2006-01-02 15:04:05"),
 		})
+	})
+
+	app.GET("/echo", func(c echo.Context) error {
+		var sb strings.Builder
+		for k, v := range c.Request().Header {
+			sb.WriteString(fmt.Sprintf("%s: %s\n", k, strings.Join(v, ", ")))
+		}
+		return c.String(http.StatusOK, sb.String())
 	})
 
 	logger.Info("Starting server on port 8080")
