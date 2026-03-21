@@ -7,6 +7,7 @@ import (
 	"main/logger"
 	"main/shared"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -27,11 +28,11 @@ func main() {
 	shared.SetupEnv(".")
 	logger.Info("Application initialized successfully")
 
-	app := echo.New()
+	// When on railway, the public domain is available in the environment variable RAILWAY_PUBLIC_DOMAIN.
+	domain := os.Getenv("RAILWAY_PUBLIC_DOMAIN")
+	logger.Info("Running on domain", zap.String("domain", domain))
 
-	// Not working for some reason, always returns the IP of the load balancer instead of the client IP.
-	// app.IPExtractor = echo.ExtractIPFromXFFHeader()
-	// app.IPExtractor = echo.ExtractIPFromRealIPHeader()
+	app := echo.New()
 
 	t := template.Must(template.ParseGlob("templates/*.html"))
 	app.Renderer = &TemplateRenderer{templates: t}
@@ -42,12 +43,17 @@ func main() {
 			ip = "uncertain (could not determine client IP)"
 		}
 
-		// logger.Info("Root endpoint called", zap.String("client_ip", ip))
+		// User-Agent
+		ua := c.Request().Header.Get("User-Agent")
+		if ua == "" {
+			ua = "uncertain (could not determine user agent)"
+		}
 
 		accept := c.Request().Header.Get("Accept")
 		if strings.Contains(accept, "application/json") {
 			return c.JSON(http.StatusOK, map[string]string{
-				"ip": ip,
+				"ip":         ip,
+				"user_agent": ua,
 			})
 		}
 
