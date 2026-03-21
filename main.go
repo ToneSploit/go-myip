@@ -1,12 +1,13 @@
 package main
 
 import (
-	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 	"main/logger"
 	"main/shared"
 	"net/http"
 	"time"
+
+	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -15,8 +16,12 @@ func main() {
 	logger.Info("Application initialized successfully")
 
 	app := echo.New()
+	app.IPExtractor = echo.ExtractIPFromXFFHeader()
 
 	app.GET("/", func(c echo.Context) error {
+		logger.Info("Root endpoint called", zap.String("client_ip", c.RealIP()))
+		// ip := c.RealIP()
+
 		return c.JSON(http.StatusOK, map[string]interface{}{
 			"status": "ok",
 			"slogan": "Wow, so this is what it's like to be on the internet!",
