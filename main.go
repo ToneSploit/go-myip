@@ -60,13 +60,13 @@ func main() {
 		},
 	}))
 
-	// Implement some rate limiting
-	app.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+	// Rate limiter — applied per route, not globally (excludes /health)
+	rateLimiter := middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 		Store: middleware.NewRateLimiterMemoryStoreWithConfig(
 			middleware.RateLimiterMemoryStoreConfig{
 				Rate:      rate.Limit(10.0 / 60.0), // 10 requests per minute
-				Burst:     5,                       // allow small bursts
-				ExpiresIn: 5 * time.Minute,         // clean up inactive IPs after 5 min
+				Burst:     5,
+				ExpiresIn: 5 * time.Minute,
 			},
 		),
 		IdentifierExtractor: func(c echo.Context) (string, error) {
@@ -82,9 +82,10 @@ func main() {
 			if strings.Contains(accept, "text/plain") {
 				return c.String(http.StatusTooManyRequests, "Rate limit exceeded, please slow down.\n")
 			}
-			return c.HTML(http.StatusTooManyRequests, `<p>Rate limit exceeded — please slow down.</p>`)
+			return c.HTML(http.StatusTooManyRequests, "<p>Rate limit exceeded — please slow down.</p>")
 		},
-	}))
+	})
+	// app.Use(rateLimiter)
 
 	t := template.Must(template.ParseGlob("templates/*.html"))
 	app.Renderer = &TemplateRenderer{templates: t}
@@ -159,7 +160,7 @@ func main() {
 			"Tinylytics":    viper.GetString("TINYLYTICS"),
 		})
 
-	})
+	}, rateLimiter)
 
 	app.GET("/health", func(c echo.Context) error {
 		logger.Info("/health called")
@@ -168,14 +169,6 @@ func main() {
 			"slogan": "All aboard the railway express!",
 			"date":   time.Now().Format("2006-01-02 15:04:05"),
 		})
-	})
-
-	app.GET("/echo", func(c echo.Context) error {
-		var sb strings.Builder
-		for k, v := range c.Request().Header {
-			sb.WriteString(fmt.Sprintf("%s: %s\n", k, strings.Join(v, ", ")))
-		}
-		return c.String(http.StatusOK, sb.String())
 	})
 
 	logger.Info("Starting server on port 8080")
