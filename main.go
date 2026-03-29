@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
@@ -50,6 +51,13 @@ func main() {
 	}
 
 	app := echo.New()
+	// app.Use(middleware.Recover()) // Add this right after creating the app
+	app.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
+		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
+			logger.Error("panic recovered", zap.Error(err), zap.ByteString("stack", stack))
+			return nil
+		},
+	}))
 
 	t := template.Must(template.ParseGlob("templates/*.html"))
 	app.Renderer = &TemplateRenderer{templates: t}
