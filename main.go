@@ -60,13 +60,15 @@ func main() {
 		},
 	}))
 
+	limiter_rate, limiter_burst, limiter_expires := getRateLimitConfig()
+
 	// Rate limiter — applied per route, not globally (excludes /health)
 	rateLimiter := middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
 		Store: middleware.NewRateLimiterMemoryStoreWithConfig(
 			middleware.RateLimiterMemoryStoreConfig{
-				Rate:      rate.Limit(10.0 / 60.0), // 10 requests per minute
-				Burst:     5,
-				ExpiresIn: 5 * time.Minute,
+				Rate:      rate.Limit(limiter_rate / 60.0), // X requests per minute
+				Burst:     limiter_burst,
+				ExpiresIn: limiter_expires,
 			},
 		),
 		IdentifierExtractor: func(c echo.Context) (string, error) {
@@ -85,7 +87,7 @@ func main() {
 			return c.HTML(http.StatusTooManyRequests, "<p>Rate limit exceeded — please slow down.</p>")
 		},
 	})
-	// app.Use(rateLimiter)
+	// app.Use(rateLimiter) // ---> Not the same rate limiter for all
 
 	t := template.Must(template.ParseGlob("templates/*.html"))
 	app.Renderer = &TemplateRenderer{templates: t}
@@ -213,4 +215,26 @@ func getClientIP(r *http.Request) string {
 	}
 
 	return ip
+}
+
+func getRateLimitConfig() (int, int, time.Duration) {
+	// Get rate with fallback to default
+	rate := viper.GetInt("APP_RATE_LIMIT_REQUESTS_PER_MINUTE")
+	if rate <= 0 {
+		rate = 20 // Default value
+	}
+
+	// Get burst with fallback to default
+	burst := viper.GetInt("APP_RATE_LIMIT_BURST")
+	if burst <= 0 {
+		burst = 5 // Default value
+	}
+
+	// Get expiration in seconds with fallback
+	expiresSeconds := viper.GetInt("APP_RATE_LIMIT_EXPIRES_SECONDS")
+	if expiresSeconds <= 0 {
+		expiresSeconds = 360 // Default 1 hour
+	}
+
+	return rate, burst, time.Duration(expiresSeconds) * time.Second
 }
