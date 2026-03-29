@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const maxFileSize = 100 << 20 // 100 MB
+
 func DownloadGeoLiteDB() (string, error) {
 	licenseKey := viper.GetString("MAXMIND_LICENSE_ID")
 	if licenseKey == "" {
@@ -73,6 +75,11 @@ func DownloadGeoLiteDB() (string, error) {
 			continue
 		}
 
+		// Reject entries that declare an oversized file in the header
+		if header.Size > maxFileSize {
+			return "", fmt.Errorf("tar entry %s claims size %d which exceeds limit of %d bytes", header.Name, header.Size, maxFileSize)
+		}
+
 		// Flatten the path, only use the base filename
 		baseName := filepath.Base(header.Name)
 		destPath := filepath.Join("geoip", baseName)
@@ -82,9 +89,14 @@ func DownloadGeoLiteDB() (string, error) {
 			return "", fmt.Errorf("failed to create file %s: %w", destPath, err)
 		}
 
-		if _, err := io.Copy(outFile, tarReader); err != nil {
+		written, err := io.Copy(outFile, io.LimitReader(tarReader, maxFileSize))
+		if err != nil {
 			outFile.Close()
 			return "", fmt.Errorf("failed to write file %s: %w", destPath, err)
+		}
+		if written >= maxFileSize {
+			outFile.Close()
+			return "", fmt.Errorf("file %s exceeds maximum allowed size of %d bytes, aborting", destPath, maxFileSize)
 		}
 		outFile.Close()
 
