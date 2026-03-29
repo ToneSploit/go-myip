@@ -7,6 +7,7 @@ require (
 	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/spf13/viper v1.21.0
 	go.uber.org/zap v1.27.1
+	golang.org/x/time v0.14.0
 )
 
 require (
@@ -30,6 +31,5 @@ require (
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
-	golang.org/x/time v0.14.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )

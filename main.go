@@ -16,6 +16,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 type TemplateRenderer struct {
@@ -36,7 +37,6 @@ func main() {
 	logger.Info("Running on domain", zap.String("domain", domain))
 
 	var MaxmindDB string
-	// if os.Getenv("GEOIP_ENABLED") == "true" {
 	if viper.GetString("GEOIP_ENABLED") == "true" {
 		logger.Info("GeoIP lookups are enabled")
 		// Download the GeoLite2 database at startup and log the result.
@@ -51,7 +51,8 @@ func main() {
 	}
 
 	app := echo.New()
-	// app.Use(middleware.Recover()) // Add this right after creating the app
+
+	// Add middleware for logging and recovery
 	app.Use(middleware.RecoverWithConfig(middleware.RecoverConfig{
 		LogErrorFunc: func(c echo.Context, err error, stack []byte) error {
 			logger.Error("panic recovered", zap.Error(err), zap.ByteString("stack", stack))
@@ -59,17 +60,36 @@ func main() {
 		},
 	}))
 
+	// Implement some rate limiting
+	app.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+		Store: middleware.NewRateLimiterMemoryStoreWithConfig(
+			middleware.RateLimiterMemoryStoreConfig{
+				Rate:      rate.Limit(10.0 / 60.0), // 10 requests per minute
+				Burst:     5,                       // allow small bursts
+				ExpiresIn: 5 * time.Minute,         // clean up inactive IPs after 5 min
+			},
+		),
+		IdentifierExtractor: func(c echo.Context) (string, error) {
+			return getClientIP(c.Request()), nil
+		},
+		DenyHandler: func(c echo.Context, identifier string, err error) error {
+			accept := c.Request().Header.Get("Accept")
+			if strings.Contains(accept, "application/json") {
+				return c.JSON(http.StatusTooManyRequests, map[string]string{
+					"error": "rate limit exceeded, please slow down",
+				})
+			}
+			if strings.Contains(accept, "text/plain") {
+				return c.String(http.StatusTooManyRequests, "Rate limit exceeded, please slow down.\n")
+			}
+			return c.HTML(http.StatusTooManyRequests, `<p>Rate limit exceeded — please slow down.</p>`)
+		},
+	}))
+
 	t := template.Must(template.ParseGlob("templates/*.html"))
 	app.Renderer = &TemplateRenderer{templates: t}
 
 	app.GET("/", func(c echo.Context) error {
-		// ip := c.Request().Header.Get("X-Real-Ip")
-		// if ip == "" {
-		// 	ip = "uncertain (could not determine client IP)"
-		// }
-
-		// Replace lines 63-121
-
 		ip := getClientIP(c.Request())
 		publicIP := isPublicIP(net.ParseIP(ip))
 
