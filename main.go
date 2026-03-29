@@ -6,12 +6,14 @@ import (
 	"io"
 	"main/logger"
 	"main/shared"
+	"net"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
@@ -33,7 +35,8 @@ func main() {
 	logger.Info("Running on domain", zap.String("domain", domain))
 
 	var MaxmindDB string
-	if os.Getenv("GEOIP_ENABLED") == "true" {
+	// if os.Getenv("GEOIP_ENABLED") == "true" {
+	if viper.GetString("GEOIP_ENABLED") == "true" {
 		logger.Info("GeoIP lookups are enabled")
 		// Download the GeoLite2 database at startup and log the result.
 		var err error
@@ -52,9 +55,15 @@ func main() {
 	app.Renderer = &TemplateRenderer{templates: t}
 
 	app.GET("/", func(c echo.Context) error {
-		ip := c.Request().Header.Get("X-Real-Ip")
-		if ip == "" {
-			ip = "uncertain (could not determine client IP)"
+		// ip := c.Request().Header.Get("X-Real-Ip")
+		// if ip == "" {
+		// 	ip = "uncertain (could not determine client IP)"
+		// }
+
+		ip := getClientIP(c.Request())
+
+		if !isPublicIP(net.ParseIP(ip)) {
+			ip = "8.8.8.8" // fallback IP of my choice
 		}
 
 		// User-Agent
@@ -63,12 +72,20 @@ func main() {
 			ua = "uncertain (could not determine user agent)"
 		}
 
+		println(ip)
+
 		var loc *shared.GeoLocation
 		if MaxmindDB != "" {
 			var err error
 			loc, err = shared.LookupIP(MaxmindDB, ip)
 			if err != nil {
 				logger.Error("Failed to lookup IP", zap.Error(err))
+				loc.City = "uncertain (failed to lookup IP)"
+				loc.Country = "uncertain (failed to lookup IP)"
+				loc.Continent = "uncertain (failed to lookup IP)"
+				loc.ContinentCode = "uncertain (failed to lookup IP)"
+				loc.CountryCode = "uncertain (failed to lookup IP)"
+				println(loc.City)
 			}
 		}
 
@@ -123,4 +140,42 @@ func main() {
 	if err := app.Start(":8080"); err != nil {
 		logger.Fatal("Server failed to start", zap.Error(err))
 	}
+}
+
+func isPublicIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+		return false
+	}
+	return true
+}
+
+// Get the client IP address
+func getClientIP(r *http.Request) string {
+	// First check X-Real-Ip header
+	ip := r.Header.Get("X-Real-Ip")
+	if ip != "" {
+		return ip
+	}
+
+	// If X-Real-Ip is not set, check X-Forwarded-For
+	ip = r.Header.Get("X-Forwarded-For")
+	if ip != "" {
+		// X-Forwarded-For may contain multiple IPs, take the first one
+		ips := strings.Split(ip, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	// If no proxy headers are available, get the direct IP
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// If there's an error splitting the address, just return it as is
+		return r.RemoteAddr
+	}
+
+	return ip
 }

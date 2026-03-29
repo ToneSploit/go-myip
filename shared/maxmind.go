@@ -9,10 +9,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 func DownloadGeoLiteDB() (string, error) {
-	licenseKey := os.Getenv("MAXMIND_LICENSE_ID")
+	licenseKey := viper.GetString("MAXMIND_LICENSE_ID")
 	if licenseKey == "" {
 		return "", fmt.Errorf("MAXMIND_LICENSE_ID environment variable is not set")
 	}
