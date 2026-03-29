@@ -68,11 +68,10 @@ func main() {
 		// 	ip = "uncertain (could not determine client IP)"
 		// }
 
-		ip := getClientIP(c.Request())
+		// Replace lines 63-121
 
-		if !isPublicIP(net.ParseIP(ip)) {
-			ip = "8.8.8.8" // fallback IP of my choice
-		}
+		ip := getClientIP(c.Request())
+		publicIP := isPublicIP(net.ParseIP(ip))
 
 		// User-Agent
 		ua := c.Request().Header.Get("User-Agent")
@@ -80,45 +79,57 @@ func main() {
 			ua = "uncertain (could not determine user agent)"
 		}
 
-		println(ip)
-
 		var loc *shared.GeoLocation
-		if MaxmindDB != "" {
+		if publicIP && MaxmindDB != "" {
 			var err error
 			loc, err = shared.LookupIP(MaxmindDB, ip)
 			if err != nil {
 				logger.Error("Failed to lookup IP", zap.Error(err))
-				loc.City = "uncertain (failed to lookup IP)"
-				loc.Country = "uncertain (failed to lookup IP)"
-				loc.Continent = "uncertain (failed to lookup IP)"
-				loc.ContinentCode = "uncertain (failed to lookup IP)"
-				loc.CountryCode = "uncertain (failed to lookup IP)"
-				println(loc.City)
 			}
 		}
 
-		// Start returning different responses based on the Accept header
+		// Ensure loc is never nil
+		if loc == nil {
+			loc = &shared.GeoLocation{}
+		}
+
 		accept := c.Request().Header.Get("Accept")
 
 		if strings.Contains(accept, "application/json") {
-			return c.JSON(http.StatusOK, map[string]string{
-				"ip":             ip,
-				"user_agent":     ua,
-				"city":           loc.City,
-				"country":        loc.Country,
-				"continent":      loc.Continent,
-				"country_code":   loc.CountryCode,
-				"continent_code": loc.ContinentCode,
-			})
+			body := map[string]interface{}{
+				"ip":         ip,
+				"ip_public":  publicIP,
+				"user_agent": ua,
+			}
+			if !publicIP {
+				body["note"] = "Private or unroutable IP — geolocation unavailable"
+			} else {
+				body["city"] = loc.City
+				body["country"] = loc.Country
+				body["continent"] = loc.Continent
+				body["country_code"] = loc.CountryCode
+				body["continent_code"] = loc.ContinentCode
+			}
+			return c.JSON(http.StatusOK, body)
 		}
 
 		if strings.Contains(accept, "text/plain") {
-			return c.String(http.StatusOK, fmt.Sprintf("IP: %s\nUser-Agent: %s\nCity: %s\nCountry: %s\nContinent: %s\nCountry Code: %s\nContinent Code: %s", ip, ua, loc.City, loc.Country, loc.Continent, loc.CountryCode, loc.ContinentCode))
+			if !publicIP {
+				return c.String(http.StatusOK, fmt.Sprintf(
+					"IP: %s\nNote: Private or unroutable IP — geolocation unavailable\nUser-Agent: %s",
+					ip, ua,
+				))
+			}
+			return c.String(http.StatusOK, fmt.Sprintf(
+				"IP: %s\nUser-Agent: %s\nCity: %s\nCountry: %s\nContinent: %s\nCountry Code: %s\nContinent Code: %s",
+				ip, ua, loc.City, loc.Country, loc.Continent, loc.CountryCode, loc.ContinentCode,
+			))
 		}
 
-		// Default response
-		return c.Render(http.StatusOK, "index.html", map[string]string{
+		// Default: HTML
+		return c.Render(http.StatusOK, "index.html", map[string]interface{}{
 			"IP":            ip,
+			"IsPublicIP":    publicIP,
 			"UserAgent":     ua,
 			"City":          loc.City,
 			"Country":       loc.Country,
@@ -127,6 +138,7 @@ func main() {
 			"ContinentCode": loc.ContinentCode,
 			"Tinylytics":    viper.GetString("TINYLYTICS"),
 		})
+
 	})
 
 	app.GET("/health", func(c echo.Context) error {

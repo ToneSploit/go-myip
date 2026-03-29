@@ -14,10 +14,14 @@
     </header>
 
     <main>
-        <p>Here is your IP address. You can also query this endpoint from command-line tools to retrieve the information in plain text
+        <p>Here is your IP address. You can also query this endpoint from command-line tools to retrieve the information
+            in plain text
             or JSON.</p>
 
-
+        {{ if not .IsPublicIP }}
+        <p><strong>Notice:</strong> Your detected IP (<code>{{ .IP }}</code>) is private or unroutable.
+            Geolocation is only available for public IPs.</p>
+        {{ else }}
         <table>
             <tbody>
                 <tr>
@@ -42,7 +46,9 @@
                 </tr>{{ end }}
             </tbody>
         </table>
+        {{ end }}
     </main>
+
 
     <h2>Examples</h2>
     <p>You can use the following commands to get your visitor information in different formats:</p>
@@ -57,15 +63,16 @@
     <pre><code>Invoke-WebRequest -Headers @{Accept='application/json'} https://ip.tonesploit.sh/ | Select-Object -ExpandProperty Content</code></pre>
 
     <footer>
-      <p><small>
-        Location data provided by <a href="https://www.maxmind.com" target="_blank" rel="noopener">MaxMind GeoLite2</a>. |
-        View source on <a href="https://github.com/tonesploit/go-myip" target="_blank" rel="noopener">GitHub</a>
-      </small></p>
+        <p><small>
+                Location data provided by <a href="https://www.maxmind.com" target="_blank" rel="noopener">MaxMind
+                    GeoLite2</a>. |
+                View source on <a href="https://github.com/tonesploit/go-myip" target="_blank" rel="noopener">GitHub</a>
+            </small></p>
     </footer>
 
-{{ if .Tinylytics }}
-<script src="https://tinylytics.app/embed/{{ .Tinylytics }}.js" defer></script>
-{{ end }}
+    {{ if .Tinylytics }}
+    <script src="https://tinylytics.app/embed/{{ .Tinylytics }}.js" defer></script>
+    {{ end }}
 
 </body>
 
