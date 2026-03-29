@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"main/logger"
 	"os"
+	"time"
 
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -48,4 +49,28 @@ func mustGetwd() string {
 		return "error getting working dir"
 	}
 	return dir
+}
+
+// Rate limit functions
+
+func GetRateLimitConfig() (int, int, time.Duration) {
+	// Get rate with fallback to default
+	rate := viper.GetInt("APP_RATE_LIMIT_REQUESTS_PER_MINUTE")
+	if rate <= 0 {
+		rate = 20 // Default value
+	}
+
+	// Get burst with fallback to default
+	burst := viper.GetInt("APP_RATE_LIMIT_BURST")
+	if burst <= 0 {
+		burst = 5 // Default value
+	}
+
+	// Get expiration in seconds with fallback
+	expiresSeconds := viper.GetInt("APP_RATE_LIMIT_EXPIRES_SECONDS")
+	if expiresSeconds <= 0 {
+		expiresSeconds = 360 // Default 1 hour
+	}
+
+	return rate, burst, time.Duration(expiresSeconds) * time.Second
 }

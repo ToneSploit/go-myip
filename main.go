@@ -60,7 +60,7 @@ func main() {
 		},
 	}))
 
-	limiter_rate, limiter_burst, limiter_expires := getRateLimitConfig()
+	limiter_rate, limiter_burst, limiter_expires := shared.GetRateLimitConfig()
 
 	// Rate limiter — applied per route, not globally (excludes /health)
 	rateLimiter := middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
@@ -215,26 +215,4 @@ func getClientIP(r *http.Request) string {
 	}
 
 	return ip
-}
-
-func getRateLimitConfig() (int, int, time.Duration) {
-	// Get rate with fallback to default
-	rate := viper.GetInt("APP_RATE_LIMIT_REQUESTS_PER_MINUTE")
-	if rate <= 0 {
-		rate = 20 // Default value
-	}
-
-	// Get burst with fallback to default
-	burst := viper.GetInt("APP_RATE_LIMIT_BURST")
-	if burst <= 0 {
-		burst = 5 // Default value
-	}
-
-	// Get expiration in seconds with fallback
-	expiresSeconds := viper.GetInt("APP_RATE_LIMIT_EXPIRES_SECONDS")
-	if expiresSeconds <= 0 {
-		expiresSeconds = 360 // Default 1 hour
-	}
-
-	return rate, burst, time.Duration(expiresSeconds) * time.Second
 }
