@@ -108,6 +108,7 @@ func main() {
 			return c.String(http.StatusOK, fmt.Sprintf("IP: %s\nUser-Agent: %s\nCity: %s\nCountry: %s\nContinent: %s\nCountry Code: %s\nContinent Code: %s", ip, ua, loc.City, loc.Country, loc.Continent, loc.CountryCode, loc.ContinentCode))
 		}
 
+		// Default response
 		return c.Render(http.StatusOK, "index.html", map[string]string{
 			"IP":            ip,
 			"UserAgent":     ua,
@@ -116,6 +117,7 @@ func main() {
 			"Continent":     loc.Continent,
 			"CountryCode":   loc.CountryCode,
 			"ContinentCode": loc.ContinentCode,
+			"Tinylytics":    viper.GetString("TINYLYTICS"),
 		})
 	})
 

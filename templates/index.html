@@ -63,6 +63,11 @@
         View source on <a href="https://github.com/tonesploit/go-myip" target="_blank" rel="noopener">GitHub</a>
       </small></p>
     </footer>
+
+{{ if .Tinylytics }}
+<script src="https://tinylytics.app/embed/{{ .Tinylytics }}.js" defer></script>
+{{ end }}
+
 </body>
 
 </html>
