@@ -163,7 +163,7 @@ func isPublicIP(ip net.IP) bool {
 }
 
 // Get the client IP address
-func getClientIPOLD(r *http.Request) string {
+func getClientIP(r *http.Request) string {
 	// First check X-Real-Ip header
 	ip := r.Header.Get("X-Real-Ip")
 	if ip != "" {
@@ -187,54 +187,5 @@ func getClientIPOLD(r *http.Request) string {
 		return r.RemoteAddr
 	}
 
-	return ip
-}
-
-// Trusted proxy CIDR ranges (Railway's internal network, or your own proxy)
-var trustedProxies = []string{
-	"10.0.0.0/8",
-	"172.16.0.0/12",
-	"192.168.0.0/16",
-	"127.0.0.1/32",
-}
-
-func isTrustedProxy(remoteAddr string) bool {
-	ip, _, err := net.SplitHostPort(remoteAddr)
-	if err != nil {
-		ip = remoteAddr
-	}
-	parsed := net.ParseIP(ip)
-	if parsed == nil {
-		return false
-	}
-	for _, cidr := range trustedProxies {
-		_, network, err := net.ParseCIDR(cidr)
-		if err != nil {
-			continue
-		}
-		if network.Contains(parsed) {
-			return true
-		}
-	}
-	return false
-}
-
-func getClientIP(r *http.Request) string {
-	if isTrustedProxy(r.RemoteAddr) {
-		// Only trust forwarded headers from known proxies
-		if ip := r.Header.Get("X-Real-Ip"); ip != "" {
-			return strings.TrimSpace(ip)
-		}
-		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-			// Take the LAST IP, not the first — the last was added by your trusted proxy
-			ips := strings.Split(forwarded, ",")
-			return strings.TrimSpace(ips[len(ips)-1])
-		}
-	}
-	// Untrusted or direct connection — use socket address
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
 	return ip
 }
