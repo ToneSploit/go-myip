@@ -11,6 +11,10 @@
 <body>
     <header>
         <h1>What is my IP?</h1>
+        <nav>
+            <a href="/">What is my IP?</a>
+            <a href="/lookup">IP Lookup</a>
+        </nav>
     </header>
 
     <main>
@@ -43,6 +47,14 @@
                 {{ if .Continent }}<tr>
                     <td>Continent:</td>
                     <td>{{ .Continent }} ({{ .ContinentCode }})</td>
+                </tr>{{ end }}
+                {{ if .ASN }}<tr>
+                    <td>ASN:</td>
+                    <td>AS{{ .ASN }}</td>
+                </tr>{{ end }}
+                {{ if .Organization }}<tr>
+                    <td>Organization:</td>
+                    <td>{{ .Organization }}</td>
                 </tr>{{ end }}
             </tbody>
         </table>

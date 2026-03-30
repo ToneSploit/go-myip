@@ -37,15 +37,20 @@ func main() {
 	logger.Info("Running on domain", zap.String("domain", domain))
 
 	var MaxmindDB string
+	var MaxmindASNDB string
 	if viper.GetString("GEOIP_ENABLED") == "true" {
 		logger.Info("GeoIP lookups are enabled")
-		// Download the GeoLite2 database at startup and log the result.
 		var err error
 		MaxmindDB, err = shared.DownloadGeoLiteDB()
 		if err != nil {
-			logger.Fatal("Failed to download GeoLite2 database", zap.Error(err))
+			logger.Fatal("Failed to download GeoLite2-City database", zap.Error(err))
 		}
-		logger.Info("GeoLite2 database downloaded successfully", zap.String("file", MaxmindDB))
+		logger.Info("GeoLite2-City database downloaded successfully", zap.String("file", MaxmindDB))
+		MaxmindASNDB, err = shared.DownloadGeoLiteASNDB()
+		if err != nil {
+			logger.Fatal("Failed to download GeoLite2-ASN database", zap.Error(err))
+		}
+		logger.Info("GeoLite2-ASN database downloaded successfully", zap.String("file", MaxmindASNDB))
 	} else {
 		logger.Info("GeoIP lookups are disabled")
 	}
@@ -103,6 +108,7 @@ func main() {
 		}
 
 		var loc *shared.GeoLocation
+		var asn *shared.ASNInfo
 		if publicIP && MaxmindDB != "" {
 			var err error
 			loc, err = shared.LookupIP(MaxmindDB, ip)
@@ -110,10 +116,20 @@ func main() {
 				logger.Error("Failed to lookup IP", zap.Error(err))
 			}
 		}
+		if publicIP && MaxmindASNDB != "" {
+			var err error
+			asn, err = shared.LookupASN(MaxmindASNDB, ip)
+			if err != nil {
+				logger.Error("Failed to lookup ASN", zap.Error(err))
+			}
+		}
 
 		// Ensure loc is never nil
 		if loc == nil {
 			loc = &shared.GeoLocation{}
+		}
+		if asn == nil {
+			asn = &shared.ASNInfo{}
 		}
 
 		accept := c.Request().Header.Get("Accept")
@@ -132,6 +148,8 @@ func main() {
 				body["continent"] = loc.Continent
 				body["country_code"] = loc.CountryCode
 				body["continent_code"] = loc.ContinentCode
+				body["asn"] = asn.ASN
+				body["organization"] = asn.Organization
 			}
 			return c.JSON(http.StatusOK, body)
 		}
@@ -144,8 +162,8 @@ func main() {
 				))
 			}
 			return c.String(http.StatusOK, fmt.Sprintf(
-				"IP: %s\nUser-Agent: %s\nCity: %s\nCountry: %s\nContinent: %s\nCountry Code: %s\nContinent Code: %s",
-				ip, ua, loc.City, loc.Country, loc.Continent, loc.CountryCode, loc.ContinentCode,
+				"IP: %s\nUser-Agent: %s\nCity: %s\nCountry: %s\nContinent: %s\nCountry Code: %s\nContinent Code: %s\nASN: AS%d\nOrganization: %s",
+				ip, ua, loc.City, loc.Country, loc.Continent, loc.CountryCode, loc.ContinentCode, asn.ASN, asn.Organization,
 			))
 		}
 
@@ -159,9 +177,88 @@ func main() {
 			"Continent":     loc.Continent,
 			"CountryCode":   loc.CountryCode,
 			"ContinentCode": loc.ContinentCode,
+			"ASN":           asn.ASN,
+			"Organization":  asn.Organization,
 			"Tinylytics":    viper.GetString("TINYLYTICS"),
 		})
 
+	}, rateLimiter)
+
+	app.GET("/lookup", func(c echo.Context) error {
+		return c.Render(http.StatusOK, "lookup.html", map[string]interface{}{
+			"MaxIPs":     100,
+			"Tinylytics": viper.GetString("TINYLYTICS"),
+		})
+	}, rateLimiter)
+
+	app.POST("/lookup", func(c echo.Context) error {
+		const maxIPs = 100
+		raw := c.FormValue("ips")
+
+		// Split by newlines, commas, and spaces
+		raw = strings.ReplaceAll(raw, ",", " ")
+		raw = strings.ReplaceAll(raw, "\n", " ")
+		raw = strings.ReplaceAll(raw, "\r", " ")
+		fields := strings.Fields(raw)
+
+		if len(fields) > maxIPs {
+			fields = fields[:maxIPs]
+		}
+
+		type LookupResult struct {
+			IP            string
+			City          string
+			Country       string
+			CountryCode   string
+			Continent     string
+			ContinentCode string
+			ASN           uint
+			Organization  string
+			Error         string
+		}
+
+		results := make([]LookupResult, 0, len(fields))
+		for _, ipStr := range fields {
+			ipStr = strings.TrimSpace(ipStr)
+			if ipStr == "" {
+				continue
+			}
+			result := LookupResult{IP: ipStr}
+			parsed := net.ParseIP(ipStr)
+			if parsed == nil {
+				result.Error = "invalid IP address"
+			} else if !isPublicIP(parsed) {
+				result.Error = "private or unroutable IP"
+			} else if MaxmindDB == "" {
+				result.Error = "GeoIP lookups are disabled"
+			} else {
+				loc, err := shared.LookupIP(MaxmindDB, ipStr)
+				if err != nil {
+					result.Error = "lookup failed"
+				} else {
+					result.City = loc.City
+					result.Country = loc.Country
+					result.CountryCode = loc.CountryCode
+					result.Continent = loc.Continent
+					result.ContinentCode = loc.ContinentCode
+				}
+				if MaxmindASNDB != "" {
+					asn, err := shared.LookupASN(MaxmindASNDB, ipStr)
+					if err == nil {
+						result.ASN = asn.ASN
+						result.Organization = asn.Organization
+					}
+				}
+			}
+			results = append(results, result)
+		}
+
+		return c.Render(http.StatusOK, "lookup.html", map[string]interface{}{
+			"Results":    results,
+			"RawInput":   c.FormValue("ips"),
+			"MaxIPs":     100,
+			"Tinylytics": viper.GetString("TINYLYTICS"),
+		})
 	}, rateLimiter)
 
 	app.GET("/health", func(c echo.Context) error {

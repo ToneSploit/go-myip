@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Lookup</title>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css">
+</head>
+
+<body>
+    <header>
+        <h1>IP Lookup</h1>
+        <nav>
+            <a href="/">What is my IP?</a>
+            <a href="/lookup">IP Lookup</a>
+        </nav>
+    </header>
+
+    <main>
+        <p>Enter up to {{ .MaxIPs }} IP addresses to look up their locations. Separate them by newline, space, or comma.</p>
+
+        <form method="POST" action="/lookup">
+            <label for="ips">IP Addresses:</label>
+            <textarea id="ips" name="ips" rows="5" maxlength="4600" placeholder="e.g. 8.8.8.8, 1.1.1.1&#10;or one per line">{{ .RawInput }}</textarea>
+            <button type="submit">Look up</button>
+        </form>
+
+        {{ if .Results }}
+        <table>
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>City</th>
+                    <th>Country</th>
+                    <th>Continent</th>
+                    <th>ASN</th>
+                    <th>Organization</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Results }}
+                <tr>
+                    <td>{{ .IP }}</td>
+                    {{ if .Error }}
+                    <td colspan="5"><em>{{ .Error }}</em></td>
+                    {{ else }}
+                    <td>{{ if .City }}{{ .City }}{{ else }}-{{ end }}</td>
+                    <td>{{ if .Country }}{{ .Country }} ({{ .CountryCode }}){{ else }}-{{ end }}</td>
+                    <td>{{ if .Continent }}{{ .Continent }} ({{ .ContinentCode }}){{ else }}-{{ end }}</td>
+                    <td>{{ if .ASN }}AS{{ .ASN }}{{ else }}-{{ end }}</td>
+                    <td>{{ if .Organization }}{{ .Organization }}{{ else }}-{{ end }}</td>
+                    {{ end }}
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+        {{ end }}
+    </main>
+
+    <footer>
+        <p><small>
+            Location data provided by <a href="https://www.maxmind.com" target="_blank" rel="noopener">MaxMind GeoLite2</a>. |
+            View source on <a href="https://github.com/tonesploit/go-myip" target="_blank" rel="noopener">GitHub</a>
+        </small></p>
+    </footer>
+
+    {{ if .Tinylytics }}
+    <script src="https://tinylytics.app/embed/{{ .Tinylytics }}.js" defer></script>
+    {{ end }}
+
+</body>
+
+</html>

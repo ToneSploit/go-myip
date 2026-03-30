@@ -16,28 +16,31 @@ import (
 const maxFileSize = 100 << 20 // 100 MB
 
 func DownloadGeoLiteDB() (string, error) {
+	return downloadGeoLiteEdition("GeoLite2-City")
+}
+
+func DownloadGeoLiteASNDB() (string, error) {
+	return downloadGeoLiteEdition("GeoLite2-ASN")
+}
+
+func downloadGeoLiteEdition(editionID string) (string, error) {
 	licenseKey := viper.GetString("MAXMIND_LICENSE_ID")
 	if licenseKey == "" {
 		return "", fmt.Errorf("MAXMIND_LICENSE_ID environment variable is not set")
 	}
 
-	// Remove and recreate the geoip folder
-	if err := os.RemoveAll("geoip"); err != nil {
-		return "", fmt.Errorf("failed to remove geoip folder: %w", err)
-	}
 	if err := os.MkdirAll("geoip", 0755); err != nil {
 		return "", fmt.Errorf("failed to create geoip folder: %w", err)
 	}
 
-	// Download the tar.gz
 	url := fmt.Sprintf(
-		"https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=%s&suffix=tar.gz",
-		licenseKey,
+		"https://download.maxmind.com/app/geoip_download?edition_id=%s&license_key=%s&suffix=tar.gz",
+		editionID, licenseKey,
 	)
 
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("failed to download GeoLite2-City: %w", err)
+		return "", fmt.Errorf("failed to download %s: %w", editionID, err)
 	}
 	defer resp.Body.Close()
 
@@ -45,7 +48,6 @@ func DownloadGeoLiteDB() (string, error) {
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// Extract the tar.gz directly from the response body
 	gzReader, err := gzip.NewReader(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to create gzip reader: %w", err)
@@ -65,22 +67,18 @@ func DownloadGeoLiteDB() (string, error) {
 			return "", fmt.Errorf("failed to read tar entry: %w", err)
 		}
 
-		// Skip directories
 		if header.Typeflag == tar.TypeDir {
 			continue
 		}
 
-		// Only extract .mmdb files
 		if !strings.HasSuffix(header.Name, ".mmdb") {
 			continue
 		}
 
-		// Reject entries that declare an oversized file in the header
 		if header.Size > maxFileSize {
 			return "", fmt.Errorf("tar entry %s claims size %d which exceeds limit of %d bytes", header.Name, header.Size, maxFileSize)
 		}
 
-		// Flatten the path, only use the base filename
 		baseName := filepath.Base(header.Name)
 		destPath := filepath.Join("geoip", baseName)
 

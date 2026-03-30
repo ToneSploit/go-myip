@@ -15,6 +15,34 @@ type GeoLocation struct {
 	ContinentCode string
 }
 
+type ASNInfo struct {
+	ASN          uint
+	Organization string
+}
+
+func LookupASN(mmdbPath, ipAddress string) (*ASNInfo, error) {
+	db, err := geoip2.Open(mmdbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open mmdb: %w", err)
+	}
+	defer db.Close()
+
+	ip := net.ParseIP(ipAddress)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid IP address: %s", ipAddress)
+	}
+
+	record, err := db.ASN(ip)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lookup ASN: %w", err)
+	}
+
+	return &ASNInfo{
+		ASN:          record.AutonomousSystemNumber,
+		Organization: record.AutonomousSystemOrganization,
+	}, nil
+}
+
 func LookupIP(mmdbPath, ipAddress string) (*GeoLocation, error) {
 	db, err := geoip2.Open(mmdbPath)
 	if err != nil {
