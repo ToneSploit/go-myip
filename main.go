@@ -288,8 +288,14 @@ func isPublicIP(ip net.IP) bool {
 
 // Get the client IP address
 func getClientIP(r *http.Request) string {
-	// First check X-Real-Ip header
-	ip := r.Header.Get("X-Real-Ip")
+	// Check Cloudflare header first
+	ip := r.Header.Get("Cf-Connecting-Ip")
+	if ip != "" {
+		return ip
+	}
+
+	// Check X-Real-Ip header
+	ip = r.Header.Get("X-Real-Ip")
 	if ip != "" {
 		return ip
 	}
